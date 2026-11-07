@@ -46,3 +46,27 @@ test.describe("without JavaScript", () => {
     await expect(page.locator("[data-cv-trigger]")).toHaveAttribute("href", "/Ahmed_Nagi_Front-End_Developer_CV.pdf");
   });
 });
+
+test.describe("CV panel scrolling", () => {
+  for (const [w, h] of [[1440, 900], [390, 844]] as const) {
+    test(`mouse wheel scrolls the CV at ${w}×${h}`, async ({ page }) => {
+      await page.setViewportSize({ width: w, height: h });
+      await page.goto("/");
+      await page.locator("[data-cv-trigger]").click();
+      const dialog = page.getByRole("dialog");
+      await expect(dialog).toBeVisible();
+      const scrolled = () =>
+        dialog.evaluate((d) => {
+          let n: Element | null = d;
+          while (n) {
+            if (n.scrollTop > 0) return n.scrollTop;
+            n = n.parentElement;
+          }
+          return 0;
+        });
+      await page.mouse.move(w / 2, h / 2);
+      await page.mouse.wheel(0, 600);
+      await expect.poll(scrolled).toBeGreaterThan(0);
+    });
+  }
+});

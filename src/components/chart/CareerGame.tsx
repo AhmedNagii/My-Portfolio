@@ -22,7 +22,8 @@ type Els = {
   slots: { root?: SVGGElement | null; candle?: SVGGElement | null; wick?: SVGPathElement | null; body?: SVGRectElement | null; bug?: SVGGElement | null }[];
 };
 
-const BREAKPOINT = "(min-width: 640px)";
+// rem, like Tailwind's sm: (40rem), so JS and CSS agree at any default font size.
+const BREAKPOINT = "(min-width: 40rem)";
 
 function subscribeWidth(onChange: () => void) {
   const mq = window.matchMedia(BREAKPOINT);
@@ -259,6 +260,8 @@ export function CareerGame() {
             className="absolute inset-0 size-full cursor-pointer touch-manipulation bg-transparent outline-none"
             onPointerDown={(e) => {
               e.preventDefault();
+              // preventDefault also blocks focus; take it back so Space keeps jumping.
+              e.currentTarget.focus({ preventScroll: true });
               doJump();
             }}
             onKeyDown={(e) => {

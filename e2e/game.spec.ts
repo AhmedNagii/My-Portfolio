@@ -72,3 +72,64 @@ test.describe("without JavaScript", () => {
     await expect(page.getByRole("button", { name: "Play" })).toHaveCount(0);
   });
 });
+
+test.describe("career game input", () => {
+  test("after clicking elsewhere, clicking the chart then Space jumps without scrolling", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Play" }).click();
+    await page.locator("h1").click();
+    const jump = page.getByRole("button", { name: "Jump" });
+    await jump.click({ position: { x: 700, y: 300 } });
+    await expect(jump).toBeFocused();
+    const y = await page.evaluate(() => window.scrollY);
+    await page.keyboard.press("Space");
+    expect(await page.evaluate(() => window.scrollY)).toBe(y);
+  });
+
+  test("one tap is one jump", async ({ browser }) => {
+    const ctx = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+    const page = await ctx.newPage();
+    await page.goto("/");
+    await page.getByRole("button", { name: "Play" }).tap();
+    await page.waitForTimeout(600); // let the run-in finish
+    await page.getByRole("button", { name: "Jump" }).tap();
+    // Sample the player's height over ~1.6 s and count separate rises.
+    const ys: number[] = await page.evaluate(async () => {
+      const svg = [...document.querySelectorAll('svg[role="img"]')].find((s) => s.getBoundingClientRect().width > 0)!;
+      const player = svg.querySelector("image")!.parentElement!.parentElement!;
+      const out: number[] = [];
+      for (let i = 0; i < 80; i++) {
+        out.push(Number(/translate\([-\d.]+ ([-\d.]+)/.exec(player.getAttribute("transform")!)![1]));
+        await new Promise((r) => setTimeout(r, 20));
+      }
+      return out;
+    });
+    // Each jump has exactly one apex: y stops falling (screen up) and starts rising.
+    const jumpHeight = Math.max(...ys) - Math.min(...ys);
+    expect(jumpHeight).toBeGreaterThan(40);
+    let apexes = 0;
+    let dir = 0;
+    for (let i = 1; i < ys.length; i++) {
+      const d = ys[i] - ys[i - 1];
+      if (Math.abs(d) < 3) continue;
+      const next = Math.sign(d);
+      if (dir === -1 && next === 1) apexes++;
+      dir = next;
+    }
+    expect(apexes).toBe(1);
+    await ctx.close();
+  });
+
+  test("with a larger default font, the visible chart is the one that plays", async ({ page }) => {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send("Page.setFontSizes", { fontSizes: { standard: 20 } });
+    await page.setViewportSize({ width: 720, height: 900 });
+    await page.goto("/");
+    const visible = page.locator('svg[role="img"]:visible');
+    await expect(visible).toHaveCount(1);
+    const before = await visible.locator("path.chart-line").getAttribute("d");
+    await page.getByRole("button", { name: "Play" }).click();
+    await page.waitForTimeout(500);
+    expect(await visible.locator("path.chart-line").getAttribute("d")).not.toBe(before);
+  });
+});
