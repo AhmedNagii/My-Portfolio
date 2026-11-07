@@ -20,7 +20,7 @@ test.describe("CV panel", () => {
     expect(await dialog.evaluate((d) => d.contains(document.activeElement))).toBe(true);
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
-    expect(await page.evaluate(() => document.activeElement?.hasAttribute("data-cv-trigger"))).toBe(true);
+    await expect(page.locator("[data-cv-trigger]")).toBeFocused();
   });
 
   test("Tab stays inside the dialog", async ({ page }) => {
