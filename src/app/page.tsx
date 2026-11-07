@@ -1,7 +1,20 @@
+import { Experience } from "@/components/Experience";
+import { Footer } from "@/components/Footer";
+import { Header } from "@/components/Header";
+import { HeroCopy } from "@/components/HeroCopy";
+
 export default function Home() {
   return (
-    <main>
-      <h1>Ahmed Nagi</h1>
-    </main>
+    <div className="min-h-screen overflow-x-hidden">
+      <Header />
+      <main>
+        <section id="top" aria-label="Intro">
+          <HeroCopy />
+          <div id="chart-slot" />
+        </section>
+        <Experience />
+      </main>
+      <Footer />
+    </div>
   );
 }
