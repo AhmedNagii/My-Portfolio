@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 
@@ -16,10 +16,23 @@ const jetbrains = localFont({
   display: "swap",
 });
 
+const siteUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+  ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+  : "http://localhost:3000";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "Ahmed Nagi, Front-End Developer",
-  description: "Front-End Developer working with React and Next.js.",
+  description: "Front-End Developer working with React and Next.js. Experience, CV and a small chart game.",
+  openGraph: {
+    title: "Ahmed Nagi, Front-End Developer",
+    description: "Front-End Developer working with React and Next.js. Experience, CV and a small chart game.",
+    type: "website",
+  },
+  twitter: { card: "summary_large_image" },
 };
+
+export const viewport: Viewport = { themeColor: "#16191F", colorScheme: "dark" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
