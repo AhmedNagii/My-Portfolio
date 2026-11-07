@@ -22,6 +22,9 @@ export const profile = {
   name: "Ahmed Nagi",
   tagline: "Front-End Developer working with React and Next.js",
   email: "ahmednagi730@gmail.com",
+  // WhatsApp username links drop the @ and are lowercase: wa.me/<username>.
+  whatsappHandle: "@Ahmed_Nagii7",
+  whatsapp: "https://wa.me/ahmed_nagii7",
   linkedin: "https://www.linkedin.com/in/ahmed-mohamed-680b99232",
   github: "https://github.com/AhmedNagii",
   cvPath: "/Ahmed_Nagi_Front-End_Developer_CV.pdf",

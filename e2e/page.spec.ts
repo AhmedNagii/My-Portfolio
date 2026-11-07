@@ -23,6 +23,21 @@ test.describe("page sections", () => {
     await expect(footer.getByLabel("LinkedIn")).toHaveAttribute("href", "https://www.linkedin.com/in/ahmed-mohamed-680b99232");
     await expect(footer.getByLabel("GitHub")).toHaveAttribute("href", "https://github.com/AhmedNagii");
     await expect(footer.getByLabel("Email")).toHaveAttribute("href", "mailto:ahmednagi730@gmail.com");
+    await expect(footer.getByLabel("WhatsApp")).toHaveAttribute("href", "https://wa.me/ahmed_nagii7");
+  });
+
+  test("Contact opens a menu with email and WhatsApp; Escape closes it", async ({ page }) => {
+    await page.goto("/");
+    const contact = page.getByRole("banner").getByRole("button", { name: "Contact" });
+    await contact.click();
+    await expect(contact).toHaveAttribute("aria-expanded", "true");
+    const header = page.getByRole("banner");
+    await expect(header.getByRole("link", { name: /Email/ })).toHaveAttribute("href", "mailto:ahmednagi730@gmail.com");
+    await expect(header.getByRole("link", { name: /WhatsApp/ })).toHaveAttribute("href", "https://wa.me/ahmed_nagii7");
+    await expect(header.getByRole("link", { name: /Email/ })).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(contact).toHaveAttribute("aria-expanded", "false");
+    await expect(contact).toBeFocused();
   });
 
   test("Download CV serves the PDF", async ({ page, request }) => {

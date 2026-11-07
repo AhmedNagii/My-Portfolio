@@ -1,10 +1,11 @@
 import { profile } from "@/content";
-import { GitHubIcon, LinkedInIcon, MailIcon } from "./icons";
+import { GitHubIcon, LinkedInIcon, MailIcon, WhatsAppIcon } from "./icons";
 
 const links = [
   { label: "LinkedIn", href: profile.linkedin, Icon: LinkedInIcon },
   { label: "GitHub", href: profile.github, Icon: GitHubIcon },
   { label: "Email", href: `mailto:${profile.email}`, Icon: MailIcon },
+  { label: "WhatsApp", href: profile.whatsapp, Icon: WhatsAppIcon },
 ];
 
 export function SocialLinks({ className = "" }: { className?: string }) {

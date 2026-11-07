@@ -1,6 +1,7 @@
 import type { GameConfig } from "@/game/config";
 import { careerY } from "@/game/curves";
 import { linePath, milestone, MILESTONES, restCandles, SPRITE, WICK } from "./geometry";
+import { BODY_CLIP_Y, SHOE, type RunnerBind } from "./runner";
 
 type Bind<T> = (el: T | null) => void;
 /** Callback refs the game uses to drive the drawing between React renders. */
@@ -11,6 +12,8 @@ export type ChartNodes = Partial<{
   labels: Bind<SVGGElement>;
   player: Bind<SVGGElement>;
   sprite: Bind<SVGGElement>;
+  /** Binds the runner's legs and body as they mount. */
+  runner: RunnerBind;
 }>;
 
 export const ARIA_LABEL =
@@ -44,7 +47,7 @@ export function ChartArt({
   nodes?: ChartNodes;
   children?: React.ReactNode;
 }) {
-  const { line: lineRef, area: areaRef, decor: decorRef, labels: labelsRef, player: playerRef, sprite: spriteRef } = nodes;
+  const { line: lineRef, area: areaRef, decor: decorRef, labels: labelsRef, player: playerRef, sprite: spriteRef, runner } = nodes;
   const id = compact ? "fade-c" : "fade-d";
   const line = linePath((x) => careerY(x, c), c.width, compact ? 6 : 10);
   const px = c.width * c.restX;
@@ -57,6 +60,9 @@ export function ChartArt({
           <stop offset="0" stopColor="var(--color-accent)" stopOpacity="0.16" />
           <stop offset="1" stopColor="var(--color-accent)" stopOpacity="0" />
         </linearGradient>
+        <clipPath id={bodyClipId(compact)}>
+          <rect x={0} y={-40} width={260} height={BODY_CLIP_Y + 40} />
+        </clipPath>
       </defs>
       <g ref={decorRef}>
         <g opacity={0.8}>
@@ -102,11 +108,56 @@ export function ChartArt({
         })}
       </g>
       {children}
-      <g ref={playerRef} transform={playerTransform(px, careerY(px, c), c)}>
+      <g ref={playerRef} data-player="" transform={playerTransform(px, careerY(px, c), c)}>
         <g ref={spriteRef} className="chart-sprite">
-          <image href="/character.webp" x={SPRITE.x} y={SPRITE.y} width={SPRITE.width} height={SPRITE.height} />
+          <RunnerLegs bind={runner} />
+          <g ref={runner?.("body")}>
+            <image
+              ref={runner?.("image")}
+              href="/character.webp"
+              x={SPRITE.x}
+              y={SPRITE.y}
+              width={SPRITE.width}
+              height={SPRITE.height}
+            />
+          </g>
         </g>
       </g>
     </svg>
+  );
+}
+
+export const bodyClipId = (compact: boolean) => (compact ? "body-c" : "body-d");
+
+// The character's own palette, sampled from the image, not theme colors.
+const INK = "#0f1014";
+const PANTS = "#22262b";
+const SHOE_FILL = "#2d3036";
+const RIM = "#307ef2";
+const STRIPE = "#0eb35b";
+const SOLE = "#fdffff";
+
+/** SVG legs for the running pose. Hidden until the game poses them. */
+function RunnerLegs({ bind }: { bind?: RunnerBind }) {
+  // Back leg (1) first so the front leg (0) overlaps it. The blue rim goes
+  // under everything so it only shows on the outside of the silhouette.
+  return (
+    <g ref={bind?.("legs")} style={{ display: "none" }} aria-hidden="true">
+      <path ref={bind?.("outline")} fill="none" stroke={RIM} strokeWidth={29} strokeLinecap="round" strokeLinejoin="round" />
+      {[1, 0].map((i) => (
+        <path key={i} ref={bind?.("shoeEdge", i)} d={SHOE} fill={RIM} stroke={RIM} strokeWidth={9.5} strokeLinejoin="round" />
+      ))}
+      {[1, 0].map((i) => (
+        <g key={i}>
+          <path ref={bind?.("outline", i)} fill="none" stroke={INK} strokeWidth={24.5} strokeLinecap="round" strokeLinejoin="round" />
+          <path ref={bind?.("fill", i)} fill="none" stroke={PANTS} strokeWidth={19} strokeLinecap="round" strokeLinejoin="round" />
+          <g ref={bind?.("shoe", i)}>
+            <path d={SHOE} fill={SHOE_FILL} stroke={INK} strokeWidth={5} strokeLinejoin="round" paintOrder="stroke" />
+            <path d="M-10 17.5H30" stroke={SOLE} strokeWidth={2.4} strokeLinecap="round" />
+            <path d="M0 6L10 10M2 11L12 14.5" stroke={STRIPE} strokeWidth={2.6} strokeLinecap="round" />
+          </g>
+        </g>
+      ))}
+    </g>
   );
 }

@@ -1,4 +1,4 @@
-import { profile } from "@/content";
+import { ContactMenu } from "./ContactMenu";
 
 export function Header() {
   return (
@@ -11,9 +11,7 @@ export function Header() {
         <a href="#experience" className="hidden px-4 py-3 text-[15px] font-semibold hover:text-muted sm:inline">
           Experience
         </a>
-        <a href={`mailto:${profile.email}`} className="rounded-full bg-accent px-5 py-3 text-[15px] font-bold text-bg transition-opacity hover:opacity-85 sm:px-[22px]">
-          Contact
-        </a>
+        <ContactMenu />
       </nav>
     </header>
   );

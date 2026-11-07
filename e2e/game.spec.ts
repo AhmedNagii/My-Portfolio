@@ -47,6 +47,25 @@ test.describe("career game", () => {
     await expect(status(page)).toBeVisible({ timeout: 12_000 });
   });
 
+  test("holding Arrow Down crouches without scrolling, releasing stands up", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Play" }).click();
+    const lean = () =>
+      page.evaluate(() => {
+        const svg = [...document.querySelectorAll('svg[role="img"]')].find((s) => s.getBoundingClientRect().width > 0)!;
+        const body = svg.querySelector("image")!.parentElement!;
+        return Number(/rotate\(([-\d.]+)/.exec(body.getAttribute("transform") ?? "")?.[1] ?? 0);
+      });
+    const y = await page.evaluate(() => window.scrollY);
+    await page.keyboard.down("ArrowDown");
+    await page.waitForTimeout(300);
+    expect(await lean()).toBeGreaterThan(30);
+    expect(await page.evaluate(() => window.scrollY)).toBe(y);
+    await page.keyboard.up("ArrowDown");
+    await page.waitForTimeout(300);
+    expect(await lean()).toBeLessThan(10);
+  });
+
   test("resizing to phone mid-run resets to the Play button", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("button", { name: "Play" }).click();
@@ -96,7 +115,7 @@ test.describe("career game input", () => {
     // Sample the player's height over ~1.6 s and count separate rises.
     const ys: number[] = await page.evaluate(async () => {
       const svg = [...document.querySelectorAll('svg[role="img"]')].find((s) => s.getBoundingClientRect().width > 0)!;
-      const player = svg.querySelector("image")!.parentElement!.parentElement!;
+      const player = svg.querySelector("[data-player]")!;
       const out: number[] = [];
       for (let i = 0; i < 80; i++) {
         out.push(Number(/translate\([-\d.]+ ([-\d.]+)/.exec(player.getAttribute("transform")!)![1]));

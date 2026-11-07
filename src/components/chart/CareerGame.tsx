@@ -3,14 +3,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { COMPACT, DESKTOP, TRANSITION_RATE, type GameConfig } from "@/game/config";
 import { careerY, terrainY } from "@/game/curves";
-import { createGame, jump, playerScreenX, score, start, step, type GameState } from "@/game/engine";
+import { createGame, duck, jump, playerScreenX, score, start, step, type GameState, type ObstacleKind } from "@/game/engine";
 import { browserStorage, readBest, writeBest } from "@/game/storage";
-import { ChartArt, areaPath, playerTransform, type ChartNodes } from "./ChartArt";
+import { ChartArt, areaPath, bodyClipId, playerTransform, type ChartNodes } from "./ChartArt";
 import { GameOver } from "./GameOver";
 import { linePath, SPRITE } from "./geometry";
+import { drawRunner, runnerBinder, runnerPose, type RunnerEls } from "./runner";
 import { useGameLoop } from "./useGameLoop";
 
 type Mode = "idle" | "playing" | "over" | "closing";
+type Slot = {
+  root?: SVGGElement | null;
+  candle?: SVGGElement | null;
+  wick?: SVGPathElement | null;
+  body?: SVGRectElement | null;
+  bug?: SVGGElement | null;
+  flyer?: SVGGElement | null;
+};
 type Els = {
   line?: SVGPathElement | null;
   area?: SVGPathElement | null;
@@ -19,7 +28,7 @@ type Els = {
   player?: SVGGElement | null;
   sprite?: SVGGElement | null;
   score?: HTMLSpanElement | null;
-  slots: { root?: SVGGElement | null; candle?: SVGGElement | null; wick?: SVGPathElement | null; body?: SVGRectElement | null; bug?: SVGGElement | null }[];
+  slots: Slot[];
 };
 
 // rem, like Tailwind's sm: (40rem), so JS and CSS agree at any default font size.
@@ -32,9 +41,25 @@ function subscribeWidth(onChange: () => void) {
 }
 const isCompact = () => !window.matchMedia(BREAKPOINT).matches;
 const onServer = () => null;
-const SLOTS = [0, 1, 2, 3];
+const SLOTS = [0, 1, 2, 3, 4, 5];
 
-/** The career chart; press Play and it becomes a side-scrolling jump game. */
+const MESSAGES: Record<ObstacleKind, string> = {
+  candle: "Stopped out",
+  bug: "Build failed",
+  flyer: "Scope creep",
+};
+
+const JUMP_KEYS = new Set([" ", "Enter", "ArrowUp", "w", "W"]);
+const DUCK_KEYS = new Set(["ArrowDown", "s", "S"]);
+/** How far a finger must travel to count as a swipe, and how long a tap may wait. */
+const SWIPE_PX = 16;
+const TAP_WAIT_MS = 110;
+
+/** Moves `value` toward `target` by at most `rate * dt`. */
+const approach = (value: number, target: number, rate: number, dt: number) =>
+  value < target ? Math.min(target, value + rate * dt) : Math.max(target, value - rate * dt);
+
+/** The career chart; press Play and it becomes a side-scrolling runner. */
 export function CareerGame() {
   // null until mounted: the server renders both sizes and CSS shows one.
   const compact = useSyncExternalStore<boolean | null>(subscribeWidth, isCompact, onServer);
@@ -46,10 +71,13 @@ export function CareerGame() {
   const playBtn = useRef<HTMLButtonElement>(null);
   const jumpBtn = useRef<HTMLButtonElement>(null);
   const g = useRef<GameState>(createGame());
-  const runPhase = useRef(0);
+  /** Animation-only state: run cycle phase and smoothed air and crouch amounts. */
+  const anim = useRef({ phase: 0, air: 0, crouch: 0 });
+  const touch = useRef<{ id: number; y: number; timer: number; decided: boolean } | null>(null);
   const els = useRef<Els>({ slots: SLOTS.map(() => ({})) });
+  // A stable holder the legs' ref callbacks fill in; read only while drawing.
+  const [runnerEls] = useState<RunnerEls>(() => ({ limbs: [] }));
   const c: GameConfig = compact ? COMPACT : DESKTOP;
-
 
   const nodes = useMemo<ChartNodes>(
     () => ({
@@ -59,18 +87,20 @@ export function CareerGame() {
       labels: (e) => void (els.current.labels = e),
       player: (e) => void (els.current.player = e),
       sprite: (e) => void (els.current.sprite = e),
+      runner: runnerBinder(runnerEls),
     }),
-    [],
+    [runnerEls],
   );
 
   /** Writes the current game state into the SVG. No React render involved. */
   const draw = useCallback(() => {
     const s = g.current;
     const e = els.current;
+    const a = anim.current;
     const t = s.transition;
     const curve = (x: number) => {
-      const a = careerY(x, c);
-      return t <= 0 ? a : a + (terrainY(x + s.scroll, c) - a) * t;
+      const y = careerY(x, c);
+      return t <= 0 ? y : y + (terrainY(x + s.scroll, c) - y) * t;
     };
     const line = linePath(curve, c.width, compact ? 6 : 10);
     e.line?.setAttribute("d", line);
@@ -84,12 +114,12 @@ export function CareerGame() {
       e.labels.style.display = t > 0.34 ? "none" : "";
     }
 
-    const running = s.mode === "playing";
+    // At rest the character is the plain image; once it moves it gets legs.
+    const moving = s.mode !== "idle" || t > 0;
     const px = playerScreenX(s, c);
-    const bob = running && s.grounded ? Math.abs(Math.sin(runPhase.current)) * 5 * c.spriteScale : 0;
-    e.player?.setAttribute("transform", playerTransform(px, curve(px) - s.jumpHeight - bob, c));
-    const tilt = s.mode === "over" ? 16 : !running ? 0 : s.grounded ? Math.sin(runPhase.current) * 4 : -9;
-    e.sprite?.setAttribute("transform", `rotate(${tilt.toFixed(1)} ${SPRITE.anchorX} ${SPRITE.anchorY})`);
+    e.player?.setAttribute("transform", playerTransform(px, curve(px) - s.jumpHeight, c));
+    e.sprite?.setAttribute("transform", s.mode === "over" ? `rotate(16 ${SPRITE.anchorX} ${SPRITE.anchorY})` : "");
+    drawRunner(runnerEls, moving ? runnerPose(a.phase, a.air, a.crouch) : null, bodyClipId(!!compact));
     if (e.score) e.score.textContent = String(score(s));
 
     e.slots.forEach((slot, i) => {
@@ -100,11 +130,14 @@ export function CareerGame() {
         return;
       }
       slot.root.style.display = "";
-      const bug = o.kind === "bug";
-      slot.root.setAttribute("transform", `translate(${(o.worldX - s.scroll).toFixed(1)} ${terrainY(o.worldX, c).toFixed(1)})${bug && compact ? " scale(.8)" : ""}`);
-      if (slot.candle) slot.candle.style.display = bug ? "none" : "";
-      if (slot.bug) slot.bug.style.display = bug ? "" : "none";
-      if (!bug && slot.body && slot.wick) {
+      const x = (o.worldX - s.scroll).toFixed(1);
+      const y = (terrainY(o.worldX, c) - o.alt).toFixed(1);
+      const small = compact && o.kind !== "candle" ? ` scale(${o.kind === "flyer" ? 0.76 : 0.8})` : "";
+      slot.root.setAttribute("transform", `translate(${x} ${y})${small}`);
+      if (slot.candle) slot.candle.style.display = o.kind === "candle" ? "" : "none";
+      if (slot.bug) slot.bug.style.display = o.kind === "bug" ? "" : "none";
+      if (slot.flyer) slot.flyer.style.display = o.kind === "flyer" ? "" : "none";
+      if (o.kind === "candle" && slot.body && slot.wick) {
         const bodyH = o.height * 0.78;
         slot.body.setAttribute("x", String(-c.candleWidth / 2));
         slot.body.setAttribute("width", String(c.candleWidth));
@@ -113,27 +146,35 @@ export function CareerGame() {
         slot.wick.setAttribute("d", `M0 0V${(-o.height).toFixed(0)}`);
       }
     });
-  }, [c, compact]);
+  }, [c, compact, runnerEls]);
 
   const onFrame = useCallback(
     (dt: number) => {
       const s = g.current;
+      const a = anim.current;
+      const frameDt = Math.min(dt, 0.05);
       if (s.mode === "idle") {
         // Closing: run back to the resting spot, then stop.
-        const transition = Math.max(0, s.transition - TRANSITION_RATE * Math.min(dt, 0.05));
+        const transition = Math.max(0, s.transition - TRANSITION_RATE * frameDt);
         g.current = { ...s, transition };
+        a.phase += frameDt * 13;
+        a.air = approach(a.air, 0, 14, frameDt);
+        a.crouch = approach(a.crouch, 0, 18, frameDt);
         draw();
         if (transition > 0) return true;
         setMode("idle");
         return false;
       }
-      runPhase.current += dt * (s.speed / (compact ? 22 : 34));
       const next = step(s, c, dt, Math.random);
       g.current = next;
+      // Stride rate follows the ground speed so the feet don't skate.
+      a.phase += frameDt * (next.speed / (compact ? 15 : 24));
+      a.air = approach(a.air, next.grounded ? 0 : 1, 14, frameDt);
+      a.crouch = approach(a.crouch, next.ducking ? 1 : 0, 18, frameDt);
       draw();
       if (next.mode === "over") {
         const final = score(next);
-        setResult({ score: final, message: next.hitBy === "bug" ? "Build failed" : "Stopped out" });
+        setResult({ score: final, message: MESSAGES[next.hitBy ?? "candle"] });
         setBest((b) => {
           if (final <= b) return b;
           writeBest(final, browserStorage());
@@ -154,11 +195,12 @@ export function CareerGame() {
     if (prev.mode === "idle") setBest((b) => Math.max(b, readBest(browserStorage())));
     // Keep the scroll and the run-in so Play again continues from where the line is.
     g.current = { ...start(prev, c), transition: prev.transition, scroll: prev.scroll };
+    anim.current = { ...anim.current, air: 0, crouch: 0 };
     setMode("playing");
   };
 
   const close = () => {
-    g.current = { ...g.current, mode: "idle", obstacles: [], jumpHeight: 0 };
+    g.current = { ...g.current, mode: "idle", obstacles: [], jumpHeight: 0, ducking: false };
     draw();
     setMode("closing");
   };
@@ -169,6 +211,7 @@ export function CareerGame() {
     if (seenCompact.current === compact) return;
     seenCompact.current = compact;
     g.current = createGame();
+    anim.current = { phase: 0, air: 0, crouch: 0 };
     draw();
     setMode("idle");
   }, [compact, draw]);
@@ -189,6 +232,29 @@ export function CareerGame() {
   const doJump = () => {
     g.current = jump(g.current, c);
   };
+  const setDuck = (on: boolean) => {
+    g.current = duck(g.current, on);
+  };
+
+  // Touch: a tap jumps, a swipe down ducks until the finger lifts. A finger
+  // that hasn't moved after TAP_WAIT_MS is a tap, so a held press still jumps.
+  const endTouch = () => {
+    const t = touch.current;
+    if (!t) return;
+    window.clearTimeout(t.timer);
+    touch.current = null;
+    if (!t.decided) doJump();
+    setDuck(false);
+  };
+
+  const flyer = (
+    <g>
+      <path d="M34 -27H48M30 -17H50M36 -7H45" stroke="var(--color-muted)" strokeWidth={3} strokeLinecap="round" opacity={0.7} />
+      <path d="M-27 -18L27 -34L8 -15Z" fill="var(--color-down)" />
+      <path d="M-27 -18L8 -15L18 0Z" fill="var(--color-down)" opacity={0.72} />
+      <path d="M-27 -18L8 -15" stroke="var(--color-bg)" strokeWidth={2} strokeLinecap="round" />
+    </g>
+  );
 
   const obstacles = (
     <g aria-hidden="true">
@@ -206,6 +272,9 @@ export function CareerGame() {
             <circle cx={9} cy={-24} r={3.5} fill="var(--color-bg)" />
             <circle cx={-9} cy={-11} r={3} fill="var(--color-bg)" />
             <circle cx={9} cy={-11} r={3} fill="var(--color-bg)" />
+          </g>
+          <g ref={(e) => void (els.current.slots[i].flyer = e)} style={{ display: "none" }}>
+            {flyer}
           </g>
         </g>
       ))}
@@ -257,22 +326,68 @@ export function CareerGame() {
             ref={jumpBtn}
             type="button"
             aria-label="Jump"
-            className="absolute inset-0 size-full cursor-pointer touch-manipulation bg-transparent outline-none"
+            aria-keyshortcuts="Space ArrowUp ArrowDown"
+            aria-describedby="game-controls"
+            className="absolute inset-0 size-full cursor-pointer touch-none bg-transparent outline-none select-none"
+            onContextMenu={(e) => e.preventDefault()}
             onPointerDown={(e) => {
               e.preventDefault();
               // preventDefault also blocks focus; take it back so Space keeps jumping.
               e.currentTarget.focus({ preventScroll: true });
-              doJump();
+              if (e.pointerType !== "touch") {
+                doJump();
+                return;
+              }
+              endTouch();
+              touch.current = {
+                id: e.pointerId,
+                y: e.clientY,
+                decided: false,
+                timer: window.setTimeout(() => {
+                  const t = touch.current;
+                  if (t && !t.decided) {
+                    t.decided = true;
+                    doJump();
+                  }
+                }, TAP_WAIT_MS),
+              };
             }}
-            onKeyDown={(e) => {
-              if (e.key === " " || e.key === "Enter") {
-                e.preventDefault();
+            onPointerMove={(e) => {
+              const t = touch.current;
+              if (!t || t.id !== e.pointerId) return;
+              const dy = e.clientY - t.y;
+              if (dy > SWIPE_PX) {
+                if (!t.decided) window.clearTimeout(t.timer);
+                t.decided = true;
+                setDuck(true);
+              } else if (dy < -SWIPE_PX && !t.decided) {
+                window.clearTimeout(t.timer);
+                t.decided = true;
                 doJump();
               }
             }}
+            onPointerUp={(e) => touch.current?.id === e.pointerId && endTouch()}
+            onPointerCancel={(e) => {
+              if (touch.current?.id !== e.pointerId) return;
+              touch.current.decided = true;
+              endTouch();
+            }}
+            onKeyDown={(e) => {
+              if (JUMP_KEYS.has(e.key)) {
+                e.preventDefault();
+                doJump();
+              } else if (DUCK_KEYS.has(e.key)) {
+                e.preventDefault();
+                setDuck(true);
+              }
+            }}
+            onKeyUp={(e) => {
+              if (DUCK_KEYS.has(e.key)) setDuck(false);
+            }}
+            onBlur={() => setDuck(false)}
           />
-          <p className="pointer-events-none absolute text-[13px] text-muted" style={{ left: edge, bottom: compact ? "4px" : "12px" }}>
-            {compact ? "Tap to jump" : "Space or click to jump"}
+          <p id="game-controls" className="pointer-events-none absolute text-[13px] text-muted" style={{ left: edge, bottom: compact ? "4px" : "12px" }}>
+            {compact ? "Tap to jump · swipe down to duck" : "Space to jump · ↓ to duck"}
           </p>
         </>
       )}
