@@ -7,7 +7,7 @@ import { useEffect, useRef, type RefObject } from "react";
  * false. Pauses while the tab is hidden or `target` is off screen, and the
  * first frame after a pause gets dt 0 so nothing jumps.
  */
-export function useGameLoop(onFrame: (dt: number) => boolean, active: boolean, target: RefObject<Element | null>) {
+export function useAnimationLoop(onFrame: (dt: number) => boolean, active: boolean, target: RefObject<Element | null>) {
   const frame = useRef(onFrame);
   useEffect(() => {
     frame.current = onFrame;

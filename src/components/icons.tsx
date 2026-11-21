@@ -31,7 +31,20 @@ export const MailIcon = ({ size = 18 }: P) => (
   </Stroke>
 );
 
-export const FileIcon = ({ size = 16 }: P) => (
+export const SunIcon = ({ size = 19 }: P) => (
+  <Stroke size={size} width={2.2}>
+    <circle cx="12" cy="12" r="4.2" />
+    <path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" />
+  </Stroke>
+);
+
+export const MoonIcon = ({ size = 18 }: P) => (
+  <Stroke size={size} width={2.2}>
+    <path d="M20.5 14.2A8.5 8.5 0 1 1 9.8 3.5a6.8 6.8 0 0 0 10.7 10.7z" />
+  </Stroke>
+);
+
+export const FileIcon =({ size = 16 }: P) => (
   <Stroke size={size}>
     <path d="M6 3h8l5 5v13H6zM14 3v5h5M9.5 13h6M9.5 17h6" />
   </Stroke>

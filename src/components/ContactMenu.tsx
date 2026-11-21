@@ -43,7 +43,7 @@ export function ContactMenu() {
     };
   }, [open]);
 
-  const pill = "rounded-full bg-accent px-5 py-3 text-[15px] font-bold text-bg transition-opacity hover:opacity-85 sm:px-[22px]";
+  const pill = "rounded-full bg-brand px-5 py-3 text-[15px] font-bold text-on-brand transition-opacity hover:opacity-85 sm:px-[22px]";
 
   if (!ready) {
     return (
