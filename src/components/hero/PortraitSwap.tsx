@@ -57,25 +57,26 @@ export function PortraitSwap() {
       <span className="sr-only">{profile.name}. Show cartoon version</span>
       <span aria-hidden="true" className="pu-ring absolute rounded-full border-[3px] border-brand" />
       <span aria-hidden="true" className="pu-disc absolute rounded-full bg-brand" />
-      {/* Cut-outs on transparent 1000×1000 canvases, aligned on the face. */}
+      {/* Full-bleed portraits on white-matted square canvases, aligned on
+          the face; object-cover keeps them undistorted at any box size. */}
       <span className="pu-cutout absolute inset-0">
         <Image
           src="/hero/ahmed-photo-backlit.webp"
           alt=""
-          width={1000}
-          height={1000}
+          width={1239}
+          height={1239}
           preload
           sizes="(min-width: 64rem) 420px, (min-width: 40rem) 45vw, 90vw"
-          className="pu-photo absolute inset-0 size-full"
+          className="pu-photo absolute inset-0 size-full object-cover"
         />
         <Image
           src="/hero/ahmed-cartoon-cutout.webp"
           alt=""
-          width={1000}
-          height={1000}
+          width={1140}
+          height={1140}
           loading="eager"
           sizes="(min-width: 64rem) 420px, (min-width: 40rem) 45vw, 90vw"
-          className="pu-anime absolute inset-0 size-full"
+          className="pu-anime absolute inset-0 size-full object-cover"
         />
       </span>
       <span aria-hidden="true" className="pointer-events-none absolute bottom-[4%] left-1/2 -translate-x-1/2 rounded-full bg-bg/85 px-3 py-1 font-mono text-xs text-text backdrop-blur transition-opacity group-hover:opacity-0 group-aria-pressed:opacity-0">
