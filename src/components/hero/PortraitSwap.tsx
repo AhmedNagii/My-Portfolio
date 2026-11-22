@@ -61,7 +61,7 @@ export function PortraitSwap() {
           the face; object-cover keeps them undistorted at any box size. */}
       <span className="pu-cutout absolute inset-0">
         <Image
-          src="/hero/ahmed-photo-backlit.webp"
+          src="/ahmed-photo-backlit.webp"
           alt=""
           width={1239}
           height={1239}
@@ -70,7 +70,7 @@ export function PortraitSwap() {
           className="pu-photo absolute inset-0 size-full object-cover"
         />
         <Image
-          src="/hero/ahmed-cartoon-cutout.webp"
+          src="/ahmed-cartoon-cutout.webp"
           alt=""
           width={1140}
           height={1140}
